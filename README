@@ -1,0 +1,27 @@
+## 1. 项目编译
+项目分三个文件夹
+1. mpp_encoder: 用于编译编码部分, 形成一个动态库文件, 叫做build/libencoder_api.so
+2. rknn_yolo5: 用于编译推理部分, 主程序在里面
+3. rtmp_pusher: 用于编译推流部分, 动态库文件 build/librtmp_puser_api.so
+
+在rknn_yolov5文件夹下, 有一个main.cpp文件, 里面有一个main函数, 用于测试推理部分是否正常工作, 编译方法是运行脚本
+build-linux_RK356X.sh
+其他两个文件夹, 直接用cmake --build build编译记得
+编译完记得把动态库挪到rknn_yolov5的libs文件夹下, 并adb push到板子的/usr/lib64文件夹下
+
+mpp的官方库是librockchip_mpp.so.0, md5sum是
+e2e8540ba73131490ac583710818205d
+如果不是并报段错误, 就把rtmp_pusher/mpp_libs下面的库文件复制到板子上.
+
+修改rtmp推流地址, 就修改rknn_yolov5/main.cpp文件中的init_rtmp_connection函数的参数
+
+ov13850跟imx335一样, 可以横着装, 分辨率也是4:3的, 所以最合适的分辨率也是1280x960
+
+## 2. 项目运行
+使用脚本build-linux_RK356X.sh编译完之后, 就把install文件夹的全部文件, 包括模型文件, 用adb push到板子上.
+跟之前的项目一样, 也需要一个rtmp_sample.h264, 把这个文件放在跟应用同一个目录
+然后运行脚本yolov5.sh即可.
+
+performance.sh 用于将cpu/npu的速度调到最高
+
+
