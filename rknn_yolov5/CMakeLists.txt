@@ -46,6 +46,7 @@ add_executable(rknn_yolo_demo
         src/rga_func.c
         src/yolo.cc
         src/main.cc
+        src/tcp_cmd.cc
 )
 
 target_link_libraries(rknn_yolo_demo

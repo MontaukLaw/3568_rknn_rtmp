@@ -39,7 +39,7 @@
 #include "encoder_api.h"
 #include <csignal>
 #include "simple_rtmp_pusher.h"
-
+#include "tcp_cmd.h"
 /*-------------------------------------------
                   Functions
 -------------------------------------------*/
@@ -48,6 +48,10 @@
 #define MODEL_WIDTH 640
 #define MODEL_HEIGHT 640
 #define RKNN_RESULT_DELAY_FRAMES 10
+
+#define CMD_SERVER_IP "159.75.182.56"
+#define TCP_PORT 9999
+
 static void printRKNNTensor(rknn_tensor_attr *attr)
 {
     printf("index=%d name=%s n_dims=%d dims=[%d %d %d %d] n_elems=%d size=%d "
@@ -291,6 +295,7 @@ static cv::Mat buf_img;
 static rknn_context ctx;
 static rknn_output outputs[3];
 static long long time_gap_total = 0;
+bool start_process = false;
 
 int resize_by_rga(char *resize_buf)
 {
@@ -306,7 +311,7 @@ int resize_by_rga(char *resize_buf)
     memset(&src, 0, sizeof(src));
     memset(&dst, 0, sizeof(dst));
 
-    printf("resize with RGA!\n");
+    // printf("resize with RGA!\n");
     src = wrapbuffer_virtualaddr((void *)buf_img.data, VIDEO_WIDTH, VIDEO_HEIGHT, RK_FORMAT_RGB_888);
     dst = wrapbuffer_virtualaddr((void *)resize_buf, m_info.width, m_info.height, RK_FORMAT_RGB_888);
     ret = imcheck(src, dst, src_rect, dst_rect);
@@ -388,6 +393,7 @@ void *rknn_process(void *args)
 
     while (if_quit == false)
     {
+
         // 当数据准备完毕的时候开始推理
         if (if_data_ready)
         {
@@ -409,7 +415,7 @@ void *rknn_process(void *args)
             {
                 rk_outputs_buf[i] = outputs[i].buf;
             }
-            
+
             post_process(rk_outputs_buf, &m_info, &letter_box, &detect_result_group);
 
             gettimeofday(&stop_time, NULL);
@@ -461,6 +467,8 @@ int main(int argc, char **argv)
 
     init_encoder(VIDEO_WIDTH, VIDEO_HEIGHT, 20);
 
+    init_cmd_client(CMD_SERVER_IP, TCP_PORT);
+
     size_t actual_size = 0;
     int img_width = 0;
     int img_height = 0;
@@ -497,8 +505,8 @@ int main(int argc, char **argv)
     }
 
     // FILE *rgb_fp = fopen("1280x960_cv.rgb", "wb");
-    // char h264_data[1024 * 1024];
-    // int h264_len = 0;
+    char h264_data[1024 * 1024];
+    int h264_len = 0;
 
     // Letter box resize
     letter_box.target_height = MODEL_HEIGHT;
@@ -514,15 +522,13 @@ int main(int argc, char **argv)
     pthread_create(&rknn_thread, NULL, rknn_process, NULL);
 
     // 初始化rtmp
-    init_rtmp_connection("rtmp_sample.h264",
-                         "rtmp://159.75.182.56/live/livestream?secret=334a72b548e8443fa51531391bfe2a2f",
+    init_rtmp_connection("rtmp_sample.h264", "rtmp://159.75.182.56/live/livestream?secret=334a72b548e8443fa51531391bfe2a2f",
                          VIDEO_WIDTH, VIDEO_HEIGHT, 20);
     timeval last_frame_time;
     timeval this_frame_time;
 
     while (if_quit == false)
     {
-
         timeval start_time, stop_time;
         gettimeofday(&start_time, NULL);
         // 图送到服务器
@@ -531,7 +537,6 @@ int main(int argc, char **argv)
         // cv::cvtColor(orig_img, orig_img, cv::COLOR_BGR2RGB);
         // cv::rotate(orig_img, orig_img, ROTATE_90_COUNTERCLOCKWISE);
 
-#if 1
         // 当rknn准备好, 就尝试复制数据
         if (if_rknn_ready)
         {
@@ -573,10 +578,10 @@ int main(int argc, char **argv)
                 }
 
                 // printf("border=(%d %d %d %d)\n", left, top, w, h);
-                printf("%s @ (%d %d %d %d) %f\n",
-                       det_result->name,
-                       det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom,
-                       det_result->prop);
+                // printf("%s @ (%d %d %d %d) %f\n",
+                //        det_result->name,
+                //        det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom,
+                //        det_result->prop);
                 // 采用opencv来绘制矩形框,颜色格式是B、G、R
                 using namespace cv;
 
@@ -586,14 +591,19 @@ int main(int argc, char **argv)
 
             if_rknn_finished--;
         }
-#endif
+
+        if (start_process == false)
+        {
+            usleep(1);
+            continue;
+        }
         // img_width = img.cols;
         // img_height = img.rows;
         // printf("img width = %d, img height = %d\n", img_width, img_height);
 
         // gettimeofday(&start_time, NULL);
         // 进行h264编码
-        encode_rgb_image_to_h264((char *)orig_img.data, VIDEO_HEIGHT * VIDEO_WIDTH * 3, (char *)h264_data, &h264_len);
+        encode_rgb_image_to_h264((char *)orig_img.data, VIDEO_HEIGHT * VIDEO_WIDTH * 3, h264_data, &h264_len);
 
         // gettimeofday(&stop_time, NULL);
         // printf("encode use %f ms\n", (__get_us(stop_time) - __get_us(start_time)) / 1000);
@@ -620,19 +630,19 @@ int main(int argc, char **argv)
         }
 
         gettimeofday(&this_frame_time, NULL);
-        printf("this:%lld\n", __get_ms(this_frame_time));
-        printf("last:%lld\n", __get_ms(last_frame_time));
+        // printf("this:%lld\n", __get_ms(this_frame_time));
+        // printf("last:%lld\n", __get_ms(last_frame_time));
         // printf("%lld\n", this_frame_time.tv_sec * 1000 + this_frame_time.tv_usec / 1000);
         long long time_gap_us = __get_us(this_frame_time) - __get_us(last_frame_time);
         if (time_gap_us < 0 || time_gap_us > 1000000)
         {
             time_gap_us = 0;
         }
-        printf("time gap: %lld\n", time_gap_us);
+        // printf("time gap: %lld\n", time_gap_us);
         time_gap_total = time_gap_total + (int)time_gap_us;
-        printf("time_gap_total: %d frame_count:%d\n", time_gap_total, frame_count);
+        // printf("time_gap_total: %d frame_count:%d\n", time_gap_total, frame_count);
         int avrage_time_gap_us = time_gap_total / frame_count;
-        printf("time between frames average: %d\n", avrage_time_gap_us);
+        // printf("time between frames average: %d\n", avrage_time_gap_us);
         int delay_us = 50000 - avrage_time_gap_us;
         if (avrage_time_gap_us < 50000)
         {

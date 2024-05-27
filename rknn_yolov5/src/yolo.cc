@@ -491,7 +491,7 @@ int post_process(void** rk_outputs, MODEL_INFO* m, LETTER_BOX* lb, detect_result
 
         // w_pad: 0 h_pad:80 resize_scale 0.5
         // (960-640)/2
-        printf("resize_scale: %f, w_pad: %d, h_pad: %d\n", lb->resize_scale, lb->w_pad, lb->h_pad);
+        // printf("resize_scale: %f, w_pad: %d, h_pad: %d\n", lb->resize_scale, lb->w_pad, lb->h_pad);
 
         group->results[last_count].box.left = (int)((clamp(x1, 0, lb->target_width) - lb->w_pad) / lb->resize_scale);
         group->results[last_count].box.top = (int)((clamp(y1, 0, lb->target_height) - lb->h_pad) / lb->resize_scale);
@@ -502,8 +502,8 @@ int post_process(void** rk_outputs, MODEL_INFO* m, LETTER_BOX* lb, detect_result
         char *label = labels[id];
         strncpy(group->results[last_count].name, label, OBJ_NAME_MAX_SIZE);
 
-        printf("result %2d: (%4d, %4d, %4d, %4d), %s\n", i, group->results[last_count].box.left, group->results[last_count].box.top,
-                group->results[last_count].box.right, group->results[last_count].box.bottom, label);
+        // printf("result %2d: (%4d, %4d, %4d, %4d), %s\n", i, group->results[last_count].box.left, group->results[last_count].box.top,
+        //         group->results[last_count].box.right, group->results[last_count].box.bottom, label);
         last_count++;
     }
     group->count = last_count;
