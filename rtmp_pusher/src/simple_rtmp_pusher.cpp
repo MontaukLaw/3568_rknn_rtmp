@@ -169,7 +169,7 @@ void get_time_gap(void)
         last_time = av_gettime();
     }
     int64_t time_gap_ms = (av_gettime() - last_time) / 1000;
-    printf("time gap:%lld\n", time_gap_ms);
+    // printf("time gap:%lld\n", time_gap_ms);
     gime_gap_total = time_gap_ms + gime_gap_total;
     // printf("gap total:%lld\n", gime_gap_total);
     // printf("gap average:%lld\n", gime_gap_total / frame_counter);

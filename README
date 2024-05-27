@@ -1,3 +1,16 @@
+20240527
+添加了com_server.py脚本, 用于在服务器中中转消息
+请使用python3 运行脚本
+
+发送消息的时候, 使用UDP发送CMD_START_CMD, CMD_STOP_CMD命令到服务器的UDP9998端口来开启/停止推流
+注意打开防火墙
+
+修改服务器地址在main.cpp文件中
+#define CMD_SERVER_IP "159.75.182.56"
+#define TCP_PORT 9999
+修改这两个宏定义即可
+
+
 ## 1. 项目编译
 项目分三个文件夹
 1. mpp_encoder: 用于编译编码部分, 形成一个动态库文件, 叫做build/libencoder_api.so
