@@ -465,8 +465,10 @@ int main(int argc, char **argv)
     // memset(&drm_ctx, 0, sizeof(drm_context));
     // drm_fd = drm_init(&drm_ctx);
 
+    // 初始化编码器
     init_encoder(VIDEO_WIDTH, VIDEO_HEIGHT, 20);
 
+    // 初始化tcp客户端, 用于接收CMD指令
     init_cmd_client(CMD_SERVER_IP, TCP_PORT);
 
     size_t actual_size = 0;
@@ -478,25 +480,30 @@ int main(int argc, char **argv)
 
     int ret;
 
+    // 读取参数
     ret = load_hyperm_param(&m_info, argc, argv);
     if (ret < 0)
         return -1;
 
+    // 读取摄像头
     cv::VideoCapture cap(0);
     if (!cap.isOpened())
     {
         std::cout << "无法打开摄像头" << std::endl;
         return -1;
     }
+
+    // 分辨率1280*960
     cap.set(cv::CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH);
     cap.set(cv::CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT);
+    
     // using opencv
     using namespace cv;
     using namespace std;
     cv::Mat orig_img;
     // cv::namedWindow("Video", cv::WINDOW_NORMAL);
     // cv::setWindowProperty("Video", cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
-
+    // 打开h264文件, 为了使用它的文件头
     FILE *fp = fopen("1280x960_cv.h264", "wb+");
     if (fp == NULL)
     {
@@ -509,12 +516,14 @@ int main(int argc, char **argv)
     int h264_len = 0;
 
     // Letter box resize
+    // 用于将摄像头的图像resize到模型的输入尺寸
     letter_box.target_height = MODEL_HEIGHT;
     letter_box.target_width = MODEL_WIDTH;
     letter_box.in_height = VIDEO_HEIGHT;
     letter_box.in_width = VIDEO_WIDTH;
 
     printf("letter box: %d %d %d %d\n", letter_box.target_height, letter_box.target_width, letter_box.in_height, letter_box.in_width);
+    // 计算长宽比之类
     compute_letter_box(&letter_box);
 
     // 启动新线程,用于推理
@@ -533,6 +542,7 @@ int main(int argc, char **argv)
         gettimeofday(&start_time, NULL);
         // 图送到服务器
         long long time_stamp = __get_ms(start_time);
+        // 读取摄像头
         cap.read(orig_img);
         // cv::cvtColor(orig_img, orig_img, cv::COLOR_BGR2RGB);
         // cv::rotate(orig_img, orig_img, ROTATE_90_COUNTERCLOCKWISE);
@@ -542,6 +552,7 @@ int main(int argc, char **argv)
         {
             // 复制数据
             // orig_img.copyTo(buf_img);
+            // 转颜色
             cv::cvtColor(orig_img, buf_img, cv::COLOR_BGR2RGB);
             // 复制完, 标志位置1
             if_data_ready = true;
@@ -584,8 +595,9 @@ int main(int argc, char **argv)
                 //        det_result->prop);
                 // 采用opencv来绘制矩形框,颜色格式是B、G、R
                 using namespace cv;
-
+                // 给结果绘制矩形框
                 cv::rectangle(orig_img, cv::Point(left, top), cv::Point(right, bottom), cv::Scalar(0, 255, 255), 5, 8, 0);
+                // 绘制label
                 putText(orig_img, detect_result_group.results[i].name, Point(left, top - 16), FONT_HERSHEY_TRIPLEX, 3, Scalar(0, 0, 255), 4, 8, 0);
             }
 
@@ -603,6 +615,7 @@ int main(int argc, char **argv)
 
         // gettimeofday(&start_time, NULL);
         // 进行h264编码
+        // 把RGB图像编码成H264, 并保存到h264_data中
         encode_rgb_image_to_h264((char *)orig_img.data, VIDEO_HEIGHT * VIDEO_WIDTH * 3, h264_data, &h264_len);
 
         // gettimeofday(&stop_time, NULL);
